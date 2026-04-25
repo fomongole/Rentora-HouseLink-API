@@ -1,0 +1,7 @@
+export enum PropertyType {
+  SINGLE_ROOM = 'SINGLE_ROOM',
+  DOUBLE_ROOM = 'DOUBLE_ROOM',
+  APARTMENT = 'APARTMENT',
+  HOUSE = 'HOUSE',
+  STUDIO = 'STUDIO',
+}
