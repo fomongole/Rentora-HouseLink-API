@@ -38,9 +38,9 @@ export class PropertiesService {
       .createQueryBuilder('property')
       .leftJoinAndSelect('property.landlord', 'landlord')
       .leftJoinAndSelect('property.district', 'district')
-      .leftJoinAndSelect('property.images', 'images')
-      .where('property.status = :status', { status: PropertyStatus.AVAILABLE });
+      .leftJoinAndSelect('property.images', 'images');
 
+    // No default status filter — admin sees everything
     if (districtId) query.andWhere('district.id = :districtId', { districtId });
     if (type) query.andWhere('property.type = :type', { type });
     if (minPrice) query.andWhere('property.price >= :minPrice', { minPrice });
@@ -54,15 +54,7 @@ export class PropertiesService {
       .take(limit)
       .getMany();
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(id: string): Promise<Property> {
