@@ -38,6 +38,3 @@ export class CreateHostelRoomDto {
   @IsOptional()
   amenities?: string[];
 }
-
-// src/modules/hostel-rooms/dto/update-hostel-room.dto.ts
-// (Keep as PartialType of CreateHostelRoomDto in actual file)

@@ -24,7 +24,7 @@ export class Booking {
   @Column()
   renterPhone: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   renterEmail: string | null;
 
   // ── What they are booking ─────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export class Booking {
   cancelledAt: Date | null;
 
   /** 'admin' | 'renter' — who initiated the cancellation */
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   cancelledBy: 'admin' | 'renter' | null;
 
   @Column({ type: 'text', nullable: true })
