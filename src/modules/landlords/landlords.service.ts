@@ -10,6 +10,22 @@ import { AuditEntity } from '../audit-logs/enums/audit-entity.enum';
 import { User } from '../users/entities/user.entity';
 import { FilterLandlordsDto } from './dto/filter-landlords.dto';
 
+/**
+ * Normalize optional string fields — convert empty strings to undefined
+ * so the DB receives NULL instead of '', preventing unique constraint
+ * violations on nationalId and email when multiple landlords have no value.
+ */
+function normalizeOptionalStrings<T extends object>(dto: T): T {
+  const result = { ...dto } as Record<string, unknown>;
+  const optionalFields = ['email', 'nationalId', 'whatsapp', 'physicalAddress', 'notes'];
+  for (const field of optionalFields) {
+    if (result[field] === '') {
+      result[field] = undefined;
+    }
+  }
+  return result as T;
+}
+
 @Injectable()
 export class LandlordsService {
   constructor(
@@ -19,7 +35,8 @@ export class LandlordsService {
   ) {}
 
   async create(dto: CreateLandlordDto, performedBy: User): Promise<Landlord> {
-    const landlord = this.landlordRepository.create(dto);
+    const normalized = normalizeOptionalStrings(dto);
+    const landlord = this.landlordRepository.create(normalized);
     const saved = await this.landlordRepository.save(landlord);
 
     await this.auditLogsService.log({
@@ -68,7 +85,8 @@ export class LandlordsService {
 
   async update(id: string, dto: UpdateLandlordDto, performedBy: User): Promise<Landlord> {
     const landlord = await this.findOne(id);
-    Object.assign(landlord, dto);
+    const normalized = normalizeOptionalStrings(dto);
+    Object.assign(landlord, normalized);
     const saved = await this.landlordRepository.save(landlord);
 
     await this.auditLogsService.log({

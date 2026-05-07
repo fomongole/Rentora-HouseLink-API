@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -62,17 +63,16 @@ export class UsersService {
     const users = await this.userRepository.find({
       order: { createdAt: 'DESC' },
     });
-    // Strip passwords before returning
     return users.map(({ password: _p, ...rest }) => rest as Omit<User, 'password'>);
   }
 
   async findByEmail(email: string): Promise<User | null> {
-  return this.userRepository
-    .createQueryBuilder('user')
-    .addSelect('user.password')   // explicitly re-select the hidden field
-    .where('user.email = :email', { email })
-    .getOne();
-}
+    return this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
+  }
 
   async findById(id: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
@@ -99,7 +99,7 @@ export class UsersService {
     dto: ChangePasswordDto,
     performedBy: User,
   ): Promise<{ message: string }> {
-    // Must explicitly fetch password for comparison
+    // Explicitly re-select the hidden password column for comparison
     const user = await this.userRepository
       .createQueryBuilder('user')
       .addSelect('user.password')
@@ -109,10 +109,19 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
-    if (!isMatch) throw new UnauthorizedException('Current password is incorrect');
 
-    user.password = await bcrypt.hash(dto.newPassword, 10);
-    await this.userRepository.save(user);
+    // Use BadRequestException (400) NOT UnauthorizedException (401).
+    // A 401 would be misread by the frontend interceptor as "session expired"
+    // and silently log the user out before the error toast could show.
+    if (!isMatch) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    // Use update() instead of save() to avoid TypeORM dirty-tracking issues
+    // with select:false columns — save() may skip the password column entirely.
+    await this.userRepository.update(userId, { password: hashedNewPassword });
 
     await this.auditLogsService.log({
       action: AuditAction.PASSWORD_CHANGE,
@@ -128,7 +137,6 @@ export class UsersService {
   async toggleActive(id: string, performedBy: User): Promise<Omit<User, 'password'>> {
     const user = await this.findById(id);
 
-    // Prevent admins from deactivating themselves
     if (user.id === performedBy.id) {
       throw new ConflictException('You cannot deactivate your own account');
     }

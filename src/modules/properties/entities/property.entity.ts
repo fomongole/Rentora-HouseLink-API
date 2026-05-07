@@ -48,7 +48,6 @@ export class Property {
   @Column({ nullable: true })
   address: string;
 
-  // Geospatial Data for Map & Radius filtering
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
   latitude: number;
 
@@ -104,7 +103,17 @@ export class Property {
   @JoinColumn({ name: 'district_id' })
   district: District;
 
-  @OneToMany(() => PropertyImage, (image) => image.property, { cascade: true })
+  /**
+   * cascade: true removed intentionally.
+   *
+   * With cascade: true, TypeORM tries to soft-remove PropertyImage rows when
+   * softRemove() is called on the property. But PropertyImage has no
+   * @DeleteDateColumn, so TypeORM throws a 500.
+   *
+   * Images are managed independently via MediaService. Hard-deletes cascade
+   * at the DB level via onDelete: 'CASCADE' on the PropertyImage FK.
+   */
+  @OneToMany(() => PropertyImage, (image) => image.property)
   images: PropertyImage[];
 
   @CreateDateColumn()
