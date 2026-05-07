@@ -88,7 +88,7 @@ export class Booking {
    * Hashed token used to authenticate renter-initiated cancellations.
    * The raw token is returned once on booking creation and never stored in plaintext.
    */
-  @Column({ select: false, nullable: true })
+  @Column({ type: 'varchar', select: false, nullable: true })
   cancellationTokenHash: string | null;
 
   @CreateDateColumn()
