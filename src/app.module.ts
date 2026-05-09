@@ -80,8 +80,8 @@ import { HealthModule } from './modules/health/health.module';
         password: config.get('database.password'),
         database: config.get('database.name'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        // synchronize: config.get('NODE_ENV') !== 'production',
-        synchronize: true,
+        synchronize: config.get('NODE_ENV') !== 'production',
+        // synchronize: true,
         logging: config.get('NODE_ENV') === 'development',
         ssl:
           config.get('NODE_ENV') === 'production'
