@@ -27,6 +27,7 @@ import { AuditEntity } from '../audit-logs/enums/audit-entity.enum';
 import { User } from '../users/entities/user.entity';
 import { HostelRoom } from '../hostel-rooms/entities/hostel-room.entity';
 import { BookingCreateResponse } from './interfaces/booking-create-response.interface';
+import { SyncBookingsDto } from './dto/sync-bookings.dto';
 
 @Injectable()
 export class BookingsService {
@@ -399,5 +400,45 @@ export class BookingsService {
       .getCount();
 
     return { total, pending, confirmed, cancelled, thisWeek };
+  }
+
+  /**
+   * Returns all bookings belonging to a specific user.
+   */
+  async findForUser(userId: string) {
+    return this.bookingRepository.find({
+      where: { userId },
+      relations: ['property', 'property.district', 'hostelRoom'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Takes guest bookings saved on the device and links them to the logged-in user account.
+   * Proof of ownership is the cancellationToken.
+   */
+  async syncGuestBookings(userId: string, dto: SyncBookingsDto) {
+    let syncedCount = 0;
+
+    for (const item of dto.bookings) {
+      // Fetch booking with the hidden hash
+      const booking = await this.bookingRepository
+        .createQueryBuilder('booking')
+        .addSelect('booking.cancellationTokenHash')
+        .where('booking.id = :id AND booking.userId IS NULL', { id: item.id })
+        .getOne();
+
+      if (!booking || !booking.cancellationTokenHash) continue;
+
+      // Verify token
+      const isValid = await bcrypt.compare(item.cancellationToken, booking.cancellationTokenHash);
+      
+      if (isValid) {
+        await this.bookingRepository.update(booking.id, { userId });
+        syncedCount++;
+      }
+    }
+
+    return { synced: syncedCount };
   }
 }

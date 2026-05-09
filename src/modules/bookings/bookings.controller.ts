@@ -21,6 +21,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { CancelByRenterDto } from './dto/cancel-by-renter.dto';
+import { SyncBookingsDto } from './dto/sync-bookings.dto';
 
 @ApiTags('Bookings')
 @Controller('bookings')
@@ -114,5 +115,22 @@ export class BookingsController {
   @ApiOperation({ summary: 'Mark a booking as completed (renter moved out) (admin only)' })
   complete(@Param('id') id: string, @CurrentUser() user: User) {
     return this.bookingsService.complete(id, user);
+  }
+
+
+  @Get('me')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all my bookings (authenticated renter)' })
+  findMyBookings(@CurrentUser() user: User) {
+    return this.bookingsService.findForUser(user.id);
+  }
+
+  @Post('sync')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Link guest bookings to account using cancellation tokens' })
+  sync(@CurrentUser() user: User, @Body() dto: SyncBookingsDto) {
+    return this.bookingsService.syncGuestBookings(user.id, dto);
   }
 }
