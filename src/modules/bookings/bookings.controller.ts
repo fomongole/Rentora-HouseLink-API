@@ -133,4 +133,16 @@ export class BookingsController {
   sync(@CurrentUser() user: User, @Body() dto: SyncBookingsDto) {
     return this.bookingsService.syncGuestBookings(user.id, dto);
   }
+
+  @Patch(':id/cancel-mine')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Authenticated renter cancels their own booking' })
+  cancelMine(
+    @Param('id') id: string,
+    @Body() dto: CancelBookingDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.bookingsService.cancelMine(id, dto.reason, user.id);
+  }
 }

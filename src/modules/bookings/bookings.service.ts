@@ -441,4 +441,21 @@ export class BookingsService {
 
     return { synced: syncedCount };
   }
+
+  /**
+   * Authenticated user cancels their own booking. No token required.
+   */
+  async cancelMine(id: string, reason: string | undefined, userId: string): Promise<Booking> {
+    const booking = await this.findOne(id);
+
+    if (booking.userId !== userId) {
+      throw new UnauthorizedException('You do not have permission to cancel this booking.');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED || booking.status === BookingStatus.COMPLETED) {
+      throw new BadRequestException(`Cannot cancel a booking with status "${booking.status}".`);
+    }
+
+    return this.cancel(id, { reason }, 'renter');
+  }
 }
