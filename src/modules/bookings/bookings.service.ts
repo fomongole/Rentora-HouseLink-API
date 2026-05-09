@@ -120,6 +120,7 @@ export class BookingsService {
     const query = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.property', 'property')
+      .leftJoinAndSelect('property.district', 'district')
       .leftJoinAndSelect('booking.hostelRoom', 'hostelRoom')
       .orderBy('booking.createdAt', 'DESC');
 
@@ -141,7 +142,7 @@ export class BookingsService {
   async findOne(id: string): Promise<Booking> {
     const booking = await this.bookingRepository.findOne({
       where: { id },
-      relations: ['property', 'hostelRoom'],
+      relations: ['property', 'property.district', 'hostelRoom'],
     });
     if (!booking) throw new NotFoundException('Booking not found');
     return booking;
