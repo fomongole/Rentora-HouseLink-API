@@ -34,6 +34,6 @@ export class Favorite {
   @Column({ type: 'uuid', name: 'property_id' })
   propertyId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
