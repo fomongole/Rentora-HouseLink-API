@@ -5,18 +5,18 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Property } from './entities/property.entity';
-import { CreatePropertyDto } from './dto/create-property.dto';
-import { UpdatePropertyDto } from './dto/update-property.dto';
-import { FilterPropertyDto } from './dto/filter-property.dto';
-import { PropertyStatus } from './enums/property-status.enum';
-import { ContactsService } from '../contacts/contacts.service';
-import { DistrictsService } from '../districts/districts.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { Property }            from './entities/property.entity';
+import { CreatePropertyDto }   from './dto/create-property.dto';
+import { UpdatePropertyDto }   from './dto/update-property.dto';
+import { FilterPropertyDto }   from './dto/filter-property.dto';
+import { PropertyStatus }      from './enums/property-status.enum';
+import { ContactsService }     from '../contacts/contacts.service';
+import { DistrictsService }    from '../districts/districts.service';
+import { AuditLogsService }    from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { AuditAction } from '../audit-logs/enums/audit-action.enum';
-import { AuditEntity } from '../audit-logs/enums/audit-entity.enum';
-import { User } from '../users/entities/user.entity';
+import { AuditAction }         from '../audit-logs/enums/audit-action.enum';
+import { AuditEntity }         from '../audit-logs/enums/audit-entity.enum';
+import { User }                from '../users/entities/user.entity';
 import {
   stripInapplicableFields,
   validateBillingCycle,
@@ -33,12 +33,13 @@ export class PropertiesService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  // ── Create ──────────────────────────────────────────────────────────────
+
   async create(dto: CreatePropertyDto, performedBy: User): Promise<Property> {
-    // Validate billing cycle against property type before anything else
     const cycleError = validateBillingCycle(dto.type, dto.billingCycle);
     if (cycleError) throw new BadRequestException(cycleError);
 
-    const contact = await this.contactsService.findOne(dto.contactId);
+    const contact  = await this.contactsService.findOne(dto.contactId);
     const district = await this.districtsService.findOne(dto.districtId);
 
     const cleanedDto = stripInapplicableFields(
@@ -64,40 +65,63 @@ export class PropertiesService {
 
     // Broadcast to all active renters — fire and forget
     void this.notificationsService.sendNewPropertyBroadcast({
-      propertyId: saved.id,
+      propertyId:    saved.id,
       propertyTitle: saved.title,
-      type: saved.type,
-      price: Number(saved.price),
-      area: saved.area,
+      type:          saved.type,
+      price:         Number(saved.price),
+      area:          saved.area,
     });
 
     return saved;
   }
 
+  // ── Find all (paginated + filtered) ────────────────────────────────────
+
   async findAll(filters: FilterPropertyDto) {
     const {
       districtId, type, status, billingCycle,
-      minPrice, maxPrice, bedrooms,
+      minPrice, maxPrice, numberOfRooms, search,
       lat, lng, radius = 5,
-      page = 1, limit = 10,
+      page = 1, limit = 15,
     } = filters;
+
+    // Hard cap: prevent accidental full-table dumps via the API
+    const safeLimit = Math.min(limit, 100);
 
     const query = this.propertyRepository
       .createQueryBuilder('property')
-      .leftJoinAndSelect('property.contact', 'contact')
+      .leftJoinAndSelect('property.contact',  'contact')
       .leftJoinAndSelect('property.district', 'district')
-      .leftJoinAndSelect('property.images', 'images');
+      .leftJoinAndSelect('property.images',   'images');
 
-    if (districtId)   query.andWhere('district.id = :districtId', { districtId });
-    if (type)         query.andWhere('property.type = :type', { type });
-    if (status)       query.andWhere('property.status = :status', { status });
-    if (billingCycle) query.andWhere('property.billingCycle = :billingCycle', { billingCycle });
-    if (minPrice)     query.andWhere('property.price >= :minPrice', { minPrice });
-    if (maxPrice)     query.andWhere('property.price <= :maxPrice', { maxPrice });
-    if (bedrooms)     query.andWhere('property.bedrooms = :bedrooms', { bedrooms });
+    if (districtId)    query.andWhere('district.id = :districtId', { districtId });
+    if (type)          query.andWhere('property.type = :type', { type });
+    if (status)        query.andWhere('property.status = :status', { status });
+    if (billingCycle)  query.andWhere('property.billingCycle = :billingCycle', { billingCycle });
+    if (minPrice)      query.andWhere('property.price >= :minPrice', { minPrice });
+    if (maxPrice)      query.andWhere('property.price <= :maxPrice', { maxPrice });
+
+    if (numberOfRooms) {
+      query.andWhere('property.numberOfRooms = :numberOfRooms', { numberOfRooms });
+    }
+
+    if (search) {
+      // Server-side full-text search — case-insensitive, matches title or area
+      query.andWhere(
+        '(LOWER(property.title) LIKE LOWER(:search) OR LOWER(property.area) LIKE LOWER(:search))',
+        { search: `%${search}%` },
+      );
+    }
 
     if (lat && lng) {
-      const haversine = `( 6371 * acos( cos( radians(:lat) ) * cos( radians( property.latitude ) ) * cos( radians( property.longitude ) - radians(:lng) ) + sin( radians(:lat) ) * sin( radians( property.latitude ) ) ) )`;
+      const haversine = `(
+        6371 * acos(
+          cos( radians(:lat) )
+          * cos( radians( property.latitude ) )
+          * cos( radians( property.longitude ) - radians(:lng) )
+          + sin( radians(:lat) ) * sin( radians( property.latitude ) )
+        )
+      )`;
       query.andWhere(`${haversine} <= :radius`, { lat, lng, radius });
       query.orderBy(haversine, 'ASC');
     } else {
@@ -105,13 +129,23 @@ export class PropertiesService {
     }
 
     const total = await query.getCount();
-    const data = await query
-      .skip((page - 1) * limit)
-      .take(limit)
+    const data  = await query
+      .skip((page - 1) * safeLimit)
+      .take(safeLimit)
       .getMany();
 
-    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit: safeLimit,
+        totalPages: Math.ceil(total / safeLimit),
+      },
+    };
   }
+
+  // ── Find one ────────────────────────────────────────────────────────────
 
   async findOne(id: string): Promise<Property> {
     const property = await this.propertyRepository.findOne({
@@ -123,13 +157,14 @@ export class PropertiesService {
     return property;
   }
 
+  // ── Update ──────────────────────────────────────────────────────────────
+
   async update(id: string, dto: UpdatePropertyDto, performedBy: User): Promise<Property> {
     const property = await this.findOne(id);
 
-    const resolvedType = dto.type ?? property.type;
-    const resolvedBillingCycle = dto.billingCycle ?? property.billingCycle ?? undefined;
+    const resolvedType         = dto.type         ?? property.type;
+    const resolvedBillingCycle = dto.billingCycle  ?? property.billingCycle ?? undefined;
 
-    // Validate billing cycle for the resolved type
     const cycleError = validateBillingCycle(resolvedType, resolvedBillingCycle);
     if (cycleError) throw new BadRequestException(cycleError);
 
@@ -160,6 +195,8 @@ export class PropertiesService {
     return saved;
   }
 
+  // ── Status helpers ──────────────────────────────────────────────────────
+
   /**
    * Directly set the property status.
    * Used internally by BookingsService. Not exposed as a public endpoint.
@@ -169,7 +206,7 @@ export class PropertiesService {
   }
 
   async toggleStatus(id: string, performedBy: User): Promise<Property> {
-    const property = await this.findOne(id);
+    const property       = await this.findOne(id);
     const previousStatus = property.status;
 
     property.status =
@@ -190,6 +227,8 @@ export class PropertiesService {
 
     return saved;
   }
+
+  // ── Soft-delete / restore ───────────────────────────────────────────────
 
   async remove(id: string, performedBy: User): Promise<{ message: string }> {
     const property = await this.findOne(id);
@@ -229,6 +268,8 @@ export class PropertiesService {
     return this.findOne(id);
   }
 
+  // ── Analytics ───────────────────────────────────────────────────────────
+
   async incrementViewCount(id: string): Promise<void> {
     await this.propertyRepository.increment({ id }, 'viewCount', 1);
   }
@@ -240,13 +281,9 @@ export class PropertiesService {
   }
 
   async getStats() {
-    const total = await this.propertyRepository.count();
-    const available = await this.propertyRepository.count({
-      where: { status: PropertyStatus.AVAILABLE },
-    });
-    const rented = await this.propertyRepository.count({
-      where: { status: PropertyStatus.RENTED },
-    });
+    const total     = await this.propertyRepository.count();
+    const available = await this.propertyRepository.count({ where: { status: PropertyStatus.AVAILABLE } });
+    const rented    = await this.propertyRepository.count({ where: { status: PropertyStatus.RENTED } });
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -270,7 +307,6 @@ export class PropertiesService {
 
     const occupancyRate = total > 0 ? Math.round((rented / total) * 100) : 0;
 
-    // Breakdown by property type
     const byTypeRaw: { type: string; count: string }[] =
       await this.propertyRepository
         .createQueryBuilder('property')
@@ -284,6 +320,15 @@ export class PropertiesService {
       byType[row.type] = Number(row.count);
     }
 
-    return { total, available, rented, occupancyRate, addedThisWeek, topViewed, topEnquired, byType };
+    return {
+      total,
+      available,
+      rented,
+      occupancyRate,
+      addedThisWeek,
+      topViewed,
+      topEnquired,
+      byType,
+    };
   }
 }

@@ -1,20 +1,22 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString, IsEnum, IsNumber, IsOptional,
-  IsUUID, IsArray, IsBoolean, IsDateString, Min,
+  IsUUID, IsArray, IsBoolean, IsDateString,
+  Min, IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PropertyType } from '../enums/property-type.enum';
-import { FurnishingStatus } from '../enums/furnishing-status.enum';
-import { BillingCycle } from '../enums/billing-cycle.enum';
+import { PropertyType }       from '../enums/property-type.enum';
+import { FurnishingStatus }   from '../enums/furnishing-status.enum';
+import { BillingCycle }       from '../enums/billing-cycle.enum';
 import { ResidentialSubtype } from '../enums/residential-subtype.enum';
+import { HotelCategory }      from '../enums/hotel-category.enum';
 
 export class CreatePropertyDto {
-  @ApiProperty({ example: 'Spacious Double House in Ntinda' })
+  @ApiProperty({ example: 'Spacious 3-Room Apartment in Kololo' })
   @IsString()
   title: string;
 
-  @ApiProperty({ example: 'A well-maintained double house with a garden...' })
+  @ApiProperty({ example: 'A well-maintained apartment with modern finishes...' })
   @IsString()
   description: string;
 
@@ -24,7 +26,7 @@ export class CreatePropertyDto {
 
   /**
    * Required when type = RESIDENTIAL_HOUSE.
-   * SINGLE = one bedroom, DOUBLE = two bedrooms.
+   * SINGLE = one bedroom / bedsitter, DOUBLE = two bedrooms.
    */
   @ApiPropertyOptional({ enum: ResidentialSubtype })
   @IsEnum(ResidentialSubtype)
@@ -47,23 +49,55 @@ export class CreatePropertyDto {
   @IsOptional()
   billingCycle?: BillingCycle;
 
-  @ApiPropertyOptional({ example: 2 })
-  @IsNumber()
+  /**
+   * Total number of rooms in the property.
+   * Replaces the former `bedrooms` + `bathrooms` pair.
+   * Not applicable to HOSTEL (stripped server-side — individual rooms managed
+   * via the HostelRooms module).
+   */
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Number of rooms in this property. Not used for HOSTEL type.',
+  })
+  @IsInt()
+  @Min(1)
   @IsOptional()
   @Type(() => Number)
-  bedrooms?: number;
+  numberOfRooms?: number;
 
-  @ApiPropertyOptional({ example: 1 })
-  @IsNumber()
+  /**
+   * HOSTEL only — the maximum number of HostelRoom entries that can be
+   * registered under this property.
+   * NULL / omitted = no cap enforced.
+   */
+  @ApiPropertyOptional({
+    example: 20,
+    description:
+      'HOSTEL only: maximum number of rooms that can be added to this hostel. ' +
+      'Leave empty for no cap.',
+  })
+  @IsInt()
+  @Min(1)
   @IsOptional()
   @Type(() => Number)
-  bathrooms?: number;
+  totalRooms?: number;
 
-  @ApiProperty({ example: 'Ntinda' })
+  /**
+   * HOTEL_LODGE only — service-tier category.
+   */
+  @ApiPropertyOptional({
+    enum: HotelCategory,
+    description: 'HOTEL_LODGE only: property category (ORDINARY | VIP | VVIP).',
+  })
+  @IsEnum(HotelCategory)
+  @IsOptional()
+  hotelCategory?: HotelCategory;
+
+  @ApiProperty({ example: 'Kololo' })
   @IsString()
   area: string;
 
-  @ApiPropertyOptional({ example: 'Plot 23, Ntinda Road' })
+  @ApiPropertyOptional({ example: 'Plot 23, Acacia Avenue' })
   @IsString()
   @IsOptional()
   address?: string;
@@ -97,8 +131,9 @@ export class CreatePropertyDto {
   @IsOptional()
   availableFrom?: string;
 
-  @ApiPropertyOptional({ example: 3 })
-  @IsNumber()
+  @ApiPropertyOptional({ example: 3, description: 'Floor / level number (0 = ground floor)' })
+  @IsInt()
+  @Min(0)
   @IsOptional()
   @Type(() => Number)
   floor?: number;
@@ -110,7 +145,6 @@ export class CreatePropertyDto {
 
   /**
    * The contact (owner or agent) managing this property.
-   * Previously called landlordId.
    */
   @ApiProperty({ example: 'uuid-of-contact' })
   @IsUUID()

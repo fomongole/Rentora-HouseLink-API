@@ -10,14 +10,15 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { PropertyType } from '../enums/property-type.enum';
-import { PropertyStatus } from '../enums/property-status.enum';
-import { FurnishingStatus } from '../enums/furnishing-status.enum';
-import { BillingCycle } from '../enums/billing-cycle.enum';
-import { District } from '../../districts/entities/district.entity';
-import { PropertyImage } from './property-image.entity';
+import { PropertyType }       from '../enums/property-type.enum';
+import { PropertyStatus }     from '../enums/property-status.enum';
+import { FurnishingStatus }   from '../enums/furnishing-status.enum';
+import { BillingCycle }       from '../enums/billing-cycle.enum';
 import { ResidentialSubtype } from '../enums/residential-subtype.enum';
-import { Contact } from 'src/modules/contacts/entities/contact.entity';
+import { HotelCategory }      from '../enums/hotel-category.enum';
+import { District }           from '../../districts/entities/district.entity';
+import { PropertyImage }      from './property-image.entity';
+import { Contact }            from 'src/modules/contacts/entities/contact.entity';
 
 @Entity('properties')
 export class Property {
@@ -38,11 +39,7 @@ export class Property {
    * Only set when type = RESIDENTIAL_HOUSE.
    * Distinguishes single-room from double-room houses.
    */
-  @Column({
-    type: 'enum',
-    enum: ResidentialSubtype,
-    nullable: true,
-  })
+  @Column({ type: 'enum', enum: ResidentialSubtype, nullable: true })
   residentialSubtype: ResidentialSubtype | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
@@ -50,23 +47,36 @@ export class Property {
 
   /**
    * The pricing period for this property's listed price.
-   * - For HOSTEL: null — billing cycle lives on each HostelRoom.
-   * - For HOTEL_LODGE: DAILY or MONTHLY.
-   * - For all others: MONTHLY | QUARTERLY | BIANNUAL | ANNUAL.
-   * Validated against PROPERTY_FIELD_CONFIG[type].allowedBillingCycles in service layer.
+   * - HOSTEL:       null — billing cycle lives on each HostelRoom.
+   * - HOTEL_LODGE:  DAILY or MONTHLY.
+   * - All others:   MONTHLY | QUARTERLY | BIANNUAL | ANNUAL.
    */
-  @Column({
-    type: 'enum',
-    enum: BillingCycle,
-    nullable: true,
-  })
+  @Column({ type: 'enum', enum: BillingCycle, nullable: true })
   billingCycle: BillingCycle | null;
 
-  @Column({ default: 1 })
-  bedrooms: number;
+  /**
+   * Generic room count for the property.
+   * Replaces the former separate `bedrooms` + `bathrooms` fields.
+   * - Not applicable to HOSTEL (rooms managed via HostelRoom entity → stripped).
+   * - Stored in the `number_of_rooms` DB column.
+   */
+  @Column({ name: 'number_of_rooms', default: 1 })
+  numberOfRooms: number;
 
-  @Column({ default: 1 })
-  bathrooms: number;
+  /**
+   * HOSTEL only: the maximum number of HostelRoom entries that can be created
+   * for this property. NULL = no cap enforced (backward-compatible).
+   * Enforced in HostelRoomsService.create().
+   */
+  @Column({ name: 'total_rooms', nullable: true })
+  totalRooms: number | null;
+
+  /**
+   * HOTEL_LODGE only: tier / service-level category.
+   * Stripped for all other property types.
+   */
+  @Column({ type: 'enum', enum: HotelCategory, name: 'hotel_category', nullable: true })
+  hotelCategory: HotelCategory | null;
 
   @Column()
   area: string;
@@ -115,8 +125,6 @@ export class Property {
 
   /**
    * The person responsible for this property — either the OWNER or an AGENT.
-   * Previously called "landlord"; renamed to reflect that not every contact
-   * is the owner — some are agents/brokers.
    */
   @ManyToOne(() => Contact, { nullable: false })
   @JoinColumn({ name: 'contact_id' })
@@ -127,7 +135,6 @@ export class Property {
   district: District;
 
   /**
-   * cascade: true removed intentionally — see original comment.
    * Images are managed independently via MediaService.
    * Hard-deletes cascade at DB level via onDelete: 'CASCADE' on the FK.
    */

@@ -1,11 +1,28 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
+import {
+  IsEnum, IsInt, IsNumber, IsOptional,
+  IsString, IsUUID, MaxLength, Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { PropertyType } from '../enums/property-type.enum';
+import { PropertyType }   from '../enums/property-type.enum';
 import { PropertyStatus } from '../enums/property-status.enum';
-import { BillingCycle } from '../enums/billing-cycle.enum';
+import { BillingCycle }   from '../enums/billing-cycle.enum';
 
 export class FilterPropertyDto {
+
+  // ── Full-text search ────────────────────────────────────────────────────
+
+  @ApiPropertyOptional({
+    example: 'Kololo apartment',
+    description: 'Free-text search applied to title and area fields (case-insensitive).',
+  })
+  @IsString()
+  @MaxLength(200)
+  @IsOptional()
+  search?: string;
+
+  // ── Structured filters ──────────────────────────────────────────────────
+
   @ApiPropertyOptional()
   @IsUUID()
   @IsOptional()
@@ -39,13 +56,18 @@ export class FilterPropertyDto {
   @Type(() => Number)
   maxPrice?: number;
 
-  @ApiPropertyOptional()
-  @IsNumber()
+  /**
+   * Filter by exact room count.
+   * Replaces the former `bedrooms` filter.
+   */
+  @ApiPropertyOptional({ example: 3, description: 'Exact number of rooms to filter by.' })
+  @IsInt()
+  @Min(1)
   @IsOptional()
   @Type(() => Number)
-  bedrooms?: number;
+  numberOfRooms?: number;
 
-  // ── Geospatial filtering (mobile app) ─────────────────────────────────────
+  // ── Geospatial filtering (mobile app) ───────────────────────────────────
 
   @ApiPropertyOptional({ description: 'User current latitude' })
   @IsNumber()
@@ -66,14 +88,18 @@ export class FilterPropertyDto {
   @Type(() => Number)
   radius?: number;
 
+  // ── Pagination ──────────────────────────────────────────────────────────
+
   @ApiPropertyOptional({ default: 1 })
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   @IsOptional()
   @Type(() => Number)
   page?: number;
 
-  @ApiPropertyOptional({ default: 10 })
-  @IsNumber()
+  @ApiPropertyOptional({ default: 15, description: 'Results per page (max 100).' })
+  @IsInt()
+  @Min(1)
   @IsOptional()
   @Type(() => Number)
   limit?: number;
