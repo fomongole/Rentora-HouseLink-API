@@ -19,6 +19,8 @@ import { HostelRoomsModule } from './modules/hostel-rooms/hostel-rooms.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { ComplaintsModule } from './modules/complaints/complaints.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { EmailModule } from './modules/email/email.module';
+import { TokenBlacklistModule } from './modules/token-blacklist/token-blacklist.module';
 
 import { envValidationSchema } from './config/env.validation';
 
@@ -44,19 +46,13 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
           process.env.NODE_ENV !== 'production'
             ? { target: 'pino-pretty', options: { colorize: true } }
             : undefined,
-
         level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
-
         autoLogging: {
           ignore: (req) => req.url === '/api/v1/health',
         },
-
         serializers: {
           req(req) {
-            return {
-              method: req.method,
-              url: req.url,
-            };
+            return { method: req.method, url: req.url };
           },
         },
       },
@@ -65,14 +61,13 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
     ThrottlerModule.forRoot([
       {
         name: 'global',
-        ttl: 60_000, // 1 minute
-        limit: 100,  // 100 requests/minute/IP
+        ttl: 60_000,
+        limit: 100,
       },
     ]),
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         host: config.get('database.host'),
@@ -82,7 +77,6 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
         database: config.get('database.name'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: config.get('NODE_ENV') !== 'production',
-        // synchronize: true,
         logging: config.get('NODE_ENV') === 'development',
         ssl:
           config.get('NODE_ENV') === 'production'
@@ -98,9 +92,11 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
 
     HealthModule,
 
-    // ── Global modules (services available everywhere via DI) ─────────────
+    // ── Global modules ────────────────────────────────────────────────────
     AuditLogsModule,
-    NotificationsModule, // @Global — NotificationsService injectable in all modules
+    NotificationsModule,
+    EmailModule,
+    TokenBlacklistModule,
 
     // ── Feature modules ───────────────────────────────────────────────────
     UsersModule,

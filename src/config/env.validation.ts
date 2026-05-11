@@ -26,4 +26,9 @@ export const envValidationSchema = Joi.object({
 
   // CORS
   ALLOWED_ORIGINS: Joi.string().default('http://localhost:3000'),
+
+  MAIL_USER: Joi.string().email().optional(),
+  MAIL_PASS: Joi.string().optional(),
+  MAIL_FROM: Joi.string().optional(),
+  APP_URL: Joi.string().uri().optional(),
 });

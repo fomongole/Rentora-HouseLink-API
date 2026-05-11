@@ -14,6 +14,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import { AuditAction } from '../audit-logs/enums/audit-action.enum';
 import { AuditEntity } from '../audit-logs/enums/audit-entity.enum';
 
@@ -24,6 +25,7 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   async create(
@@ -39,7 +41,7 @@ export class UsersService {
     const user = this.userRepository.create({ name, email, password: hashed, role });
     const saved = await this.userRepository.save(user);
 
-    // Welcome notification — only for RENTER accounts (admins don't use the mobile app)
+    // Welcome notification — only for RENTER accounts
     if (saved.role === UserRole.RENTER) {
       void this.notificationsService.sendWelcome(saved.id, saved.name);
     }
@@ -63,6 +65,9 @@ export class UsersService {
       performedBy,
       metadata: { role: user.role, email: user.email },
     });
+
+    // ── Email: welcome the new admin with their login URL ─────────────────
+    void this.emailService.sendAdminWelcome(user.email, user.name);
 
     return user;
   }
@@ -88,16 +93,28 @@ export class UsersService {
     return user;
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<Omit<User, 'password'>> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<Omit<User, 'password'>> {
     const user = await this.findById(userId);
+    const oldEmail = user.email;
 
-    if (dto.email && dto.email !== user.email) {
-      const existing = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (dto.email && dto.email !== oldEmail) {
+      const existing = await this.userRepository.findOne({
+        where: { email: dto.email },
+      });
       if (existing) throw new ConflictException('Email already in use');
     }
 
     Object.assign(user, dto);
     const saved = await this.userRepository.save(user);
+
+    // ── Email: notify both old and new address when email changes ─────────
+    if (dto.email && dto.email !== oldEmail) {
+      void this.emailService.sendEmailChanged(oldEmail, dto.email, saved.name);
+    }
+
     const { password: _p, ...rest } = saved;
     return rest as Omit<User, 'password'>;
   }
@@ -107,7 +124,6 @@ export class UsersService {
     dto: ChangePasswordDto,
     performedBy: User,
   ): Promise<{ message: string }> {
-    // Explicitly re-select the hidden password column for comparison
     const user = await this.userRepository
       .createQueryBuilder('user')
       .addSelect('user.password')
@@ -118,17 +134,11 @@ export class UsersService {
 
     const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
 
-    // Use BadRequestException (400) NOT UnauthorizedException (401).
-    // A 401 would be misread by the frontend interceptor as "session expired"
-    // and silently log the user out before the error toast could show.
     if (!isMatch) {
       throw new BadRequestException('Current password is incorrect');
     }
 
     const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
-
-    // Use update() instead of save() to avoid TypeORM dirty-tracking issues
-    // with select:false columns — save() may skip the password column entirely.
     await this.userRepository.update(userId, { password: hashedNewPassword });
 
     await this.auditLogsService.log({
@@ -139,13 +149,19 @@ export class UsersService {
       performedBy,
     });
 
-    // Security notification — alert the user so they can spot an unauthorised change
+    // ── In-app notification ───────────────────────────────────────────────
     void this.notificationsService.sendPasswordChanged(userId);
+
+    // ── Email: security alert so the user can spot an unauthorised change ──
+    void this.emailService.sendPasswordChanged(user.email, user.name);
 
     return { message: 'Password changed successfully' };
   }
 
-  async toggleActive(id: string, performedBy: User): Promise<Omit<User, 'password'>> {
+  async toggleActive(
+    id: string,
+    performedBy: User,
+  ): Promise<Omit<User, 'password'>> {
     const user = await this.findById(id);
 
     if (user.id === performedBy.id) {
@@ -164,11 +180,13 @@ export class UsersService {
       metadata: { isActive: saved.isActive },
     });
 
-    // Notify the affected user about their account status change
+    // ── In-app notifications ──────────────────────────────────────────────
     if (saved.isActive) {
       void this.notificationsService.sendAccountActivated(saved.id);
+      void this.emailService.sendAccountActivated(saved.email, saved.name);
     } else {
       void this.notificationsService.sendAccountDeactivated(saved.id);
+      void this.emailService.sendAccountDeactivated(saved.email, saved.name);
     }
 
     const { password: _p, ...rest } = saved;

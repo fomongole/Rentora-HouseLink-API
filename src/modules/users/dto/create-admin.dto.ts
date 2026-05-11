@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
 import { UserRole } from '../enums/user-role.enum';
+import { IsStrongPassword } from '../../../common/decorators/is-strong-password.decorator';
 
 export class CreateAdminDto {
   @ApiProperty({ example: 'Sarah Nakato' })
@@ -11,9 +12,7 @@ export class CreateAdminDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'SecurePass123', minLength: 6 })
-  @IsString()
-  @MinLength(6)
+  @IsStrongPassword('SecurePass123')
   password: string;
 
   @ApiPropertyOptional({ enum: UserRole, default: UserRole.ADMIN })

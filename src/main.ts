@@ -4,22 +4,21 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
-  // ── Structured logger (replaces console.log everywhere) ──────────────────
   app.useLogger(app.get(Logger));
 
-  // ── Security headers ──────────────────────────────────────────────────────
   app.use(helmet());
-
-  // ── Response compression (critical for mobile on slow networks) ───────────
   app.use(compression());
 
-  // ── CORS ──────────────────────────────────────────────────────────────────
+  // ── Cookie parser — required for reading httpOnly cookies in JwtStrategy ──
+  app.use(cookieParser());
+
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((o) =>
     o.trim(),
   ) ?? ['http://localhost:3000'];
@@ -27,13 +26,11 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+    credentials: true, // Must be true for cookies to be sent cross-origin
   });
 
-  // ── Global prefix ─────────────────────────────────────────────────────────
   app.setGlobalPrefix('api/v1');
 
-  // ── Global validation pipe ────────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -42,19 +39,16 @@ async function bootstrap() {
     }),
   );
 
-  // ── Global exception filter ───────────────────────────────────────────────
   app.useGlobalFilters(new AllExceptionsFilter());
-
-  // ── Graceful shutdown ─────────────────────────────────────────────────────
   app.enableShutdownHooks();
 
-  // ── Swagger ───────────────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('RentFinda Uganda API')
       .setDescription('Backend API for the RentFinda property rental platform')
       .setVersion('1.0')
       .addBearerAuth()
+      .addCookieAuth('access_token') // ← Document the cookie auth too
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
@@ -70,10 +64,7 @@ async function bootstrap() {
     'Bootstrap',
   );
   if (process.env.NODE_ENV !== 'production') {
-    logger.log(
-      `📚 Swagger docs: http://localhost:${port}/api/docs`,
-      'Bootstrap',
-    );
+    logger.log(`📚 Swagger docs: http://localhost:${port}/api/docs`, 'Bootstrap');
   }
 }
 

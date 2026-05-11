@@ -16,12 +16,15 @@ import { UsersModule } from '../users/users.module';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('jwt.secret') as string,
         signOptions: {
-          expiresIn: config.get('jwt.expiresIn') as any,
+          // Cast required: @nestjs/jwt v11 uses StringValue type from ms package.
+          // Config returns plain string ('7d') which is compatible at runtime.
+          expiresIn: config.get<string>('jwt.expiresIn') as unknown as number,
         },
       }),
     }),
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
+  exports: [JwtModule],
 })
 export class AuthModule {}
