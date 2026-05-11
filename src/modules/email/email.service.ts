@@ -41,7 +41,7 @@ export class EmailService {
     }
   }
 
-  // ── All public methods below are UNCHANGED ────────────────────────────────
+  // ── All public methods ────────────────────────────────
 
   async sendAdminWelcome(email: string, name: string): Promise<void> {
     const portalUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';

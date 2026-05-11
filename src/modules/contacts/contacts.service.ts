@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact } from './entities/contact.entity';
@@ -33,29 +33,65 @@ export class ContactsService {
     @InjectRepository(Contact)
     private readonly contactRepository: Repository<Contact>,
     private readonly auditLogsService: AuditLogsService,
-     private readonly emailService: EmailService,
+    private readonly emailService: EmailService,
   ) {}
 
+  // ── Uniqueness guard ──────────────────────────────────────────────────────
+  // excludeId is passed on updates so a contact isn't flagged against itself.
+  private async assertUnique(
+    fields: {
+      phone?: string;
+      email?: string;
+      nationalId?: string;
+      whatsapp?: string;
+    },
+    excludeId?: string,
+  ): Promise<void> {
+    const checks = [
+      { field: 'phone',      value: fields.phone,      message: 'Phone number already in use' },
+      { field: 'whatsapp',   value: fields.whatsapp,   message: 'WhatsApp number already in use' },
+      { field: 'email',      value: fields.email,      message: 'Email already in use' },
+      { field: 'nationalId', value: fields.nationalId, message: 'National ID already in use' },
+    ];
+
+    for (const { field, value, message } of checks) {
+      if (!value) continue;
+      const existing = await this.contactRepository.findOne({
+        where: { [field]: value },
+      });
+      if (existing && existing.id !== excludeId) {
+        throw new ConflictException(message);
+      }
+    }
+  }
+
   async create(dto: CreateContactDto, performedBy: User): Promise<Contact> {
-  const normalized = normalizeOptionalStrings(dto);
-  const contact = this.contactRepository.create(normalized);
-  const saved = await this.contactRepository.save(contact);
+    const normalized = normalizeOptionalStrings(dto);
 
-  await this.auditLogsService.log({
-    action: AuditAction.CREATE,
-    entity: AuditEntity.CONTACT,
-    entityId: saved.id,
-    entityTitle: `${saved.name} (${saved.role})`,
-    performedBy,
-  });
+    await this.assertUnique({
+      phone:      normalized.phone,
+      whatsapp:   normalized.whatsapp,
+      email:      normalized.email,
+      nationalId: normalized.nationalId,
+    });
 
-    // ── Email: welcome the new contact if they have an email on file ──────
+    const contact = this.contactRepository.create(normalized);
+    const saved = await this.contactRepository.save(contact);
+
+    await this.auditLogsService.log({
+      action: AuditAction.CREATE,
+      entity: AuditEntity.CONTACT,
+      entityId: saved.id,
+      entityTitle: `${saved.name} (${saved.role})`,
+      performedBy,
+    });
+
     if (saved.email) {
       void this.emailService.sendContactWelcome(saved.email, saved.name, saved.role);
     }
 
     return saved;
-}
+  }
 
   async findAll(filters: FilterContactsDto = {}) {
     const { search, role, page = 1, limit = 20 } = filters;
@@ -97,6 +133,17 @@ export class ContactsService {
   async update(id: string, dto: UpdateContactDto, performedBy: User): Promise<Contact> {
     const contact = await this.findOne(id);
     const normalized = normalizeOptionalStrings(dto);
+
+    await this.assertUnique(
+      {
+        phone:      normalized.phone,
+        whatsapp:   normalized.whatsapp,
+        email:      normalized.email,
+        nationalId: normalized.nationalId,
+      },
+      id,
+    );
+
     Object.assign(contact, normalized);
     const saved = await this.contactRepository.save(contact);
 

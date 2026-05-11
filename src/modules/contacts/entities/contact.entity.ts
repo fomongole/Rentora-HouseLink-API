@@ -19,7 +19,7 @@ export class Contact {
   @Column()
   name: string;
 
-  @Column()
+  @Column({ unique: true })
   phone: string;
 
   /** OWNER = property owner, AGENT = broker/agent managing on behalf of owner */
@@ -29,7 +29,7 @@ export class Contact {
   @Column({ nullable: true, unique: true })
   email: string;
 
-  @Column({ nullable: true })
+ @Column({ nullable: true, unique: true })
   whatsapp: string;
 
   /** Uganda National Identification Number */
