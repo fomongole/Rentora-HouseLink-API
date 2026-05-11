@@ -8,15 +8,7 @@
  * IMPORTANT: Keep this file in sync between backend and frontend.
  * Backend:  src/modules/properties/utils/property-field-rules.ts
  * Frontend: src/lib/property-field-rules.ts
- *
- * v2.2 changes:
- *   - Removed showBedrooms / showBathrooms
- *   + Added showNumberOfRooms (single unified room count for non-hostel types)
- *   + Added showTotalRooms    (hostel-only: cap for HostelRoom entries)
- *   + Added showHotelCategory (hotel/lodge-only: ORDINARY | VIP | VVIP)
- *   - showFloor is now true for HOSTEL and HOTEL_LODGE
  */
-
 import { PropertyType } from '../enums/property-type.enum';
 import { BillingCycle }  from '../enums/billing-cycle.enum';
 
@@ -26,21 +18,17 @@ export interface PropertyFieldConfig {
    * False for HOSTEL — rooms are managed as individual HostelRoom entities.
    */
   showNumberOfRooms: boolean;
-
   showParking: boolean;
   showFloor: boolean;
   showFurnishing: boolean;
 
   /** Whether a billingCycle must be set at the property level */
   showBillingCycle: boolean;
-
+  
   /** Which billing cycles are valid for this type */
   allowedBillingCycles: BillingCycle[];
-
+  
   showSecurityDeposit: boolean;
-
-  /** Only true for RESIDENTIAL_HOUSE — admin picks SINGLE or DOUBLE */
-  showResidentialSubtype: boolean;
 
   /** Sub-units are managed via the HostelRooms module */
   isHostel: boolean;
@@ -61,7 +49,6 @@ export interface PropertyFieldConfig {
 }
 
 export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = {
-
   [PropertyType.RESIDENTIAL_HOUSE]: {
     showNumberOfRooms:    true,
     showParking:          true,
@@ -75,13 +62,11 @@ export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = 
       BillingCycle.ANNUAL,
     ],
     showSecurityDeposit:   true,
-    showResidentialSubtype: true,
     isHostel:              false,
     isHotelLodge:          false,
     showTotalRooms:        false,
     showHotelCategory:     false,
   },
-
   [PropertyType.APARTMENT]: {
     showNumberOfRooms:    true,
     showParking:          true,
@@ -95,13 +80,11 @@ export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = 
       BillingCycle.ANNUAL,
     ],
     showSecurityDeposit:   true,
-    showResidentialSubtype: false,
     isHostel:              false,
     isHotelLodge:          false,
     showTotalRooms:        false,
     showHotelCategory:     false,
   },
-
   [PropertyType.AIRBNB]: {
     showNumberOfRooms:    true,
     showParking:          true,
@@ -116,13 +99,11 @@ export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = 
       BillingCycle.ANNUAL,
     ],
     showSecurityDeposit:   true,
-    showResidentialSubtype: false,
     isHostel:              false,
     isHotelLodge:          false,
     showTotalRooms:        false,
     showHotelCategory:     false,
   },
-
   [PropertyType.OFFICE_SPACE]: {
     showNumberOfRooms:    true,           // number of office rooms / units
     showParking:          true,
@@ -136,13 +117,11 @@ export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = 
       BillingCycle.ANNUAL,
     ],
     showSecurityDeposit:   true,
-    showResidentialSubtype: false,
     isHostel:              false,
     isHotelLodge:          false,
     showTotalRooms:        false,
     showHotelCategory:     false,
   },
-
   [PropertyType.BUSINESS_SPACE]: {
     showNumberOfRooms:    true,
     showParking:          true,
@@ -156,32 +135,28 @@ export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = 
       BillingCycle.ANNUAL,
     ],
     showSecurityDeposit:   true,
-    showResidentialSubtype: false,
     isHostel:              false,
     isHotelLodge:          false,
     showTotalRooms:        false,
     showHotelCategory:     false,
   },
-
   [PropertyType.HOSTEL]: {
     showNumberOfRooms:    false,          // individual rooms managed via HostelRoom entity
     showParking:          true,
-    showFloor:            true,           // ← enabled per client request (v2.2)
+    showFloor:            true,           
     showFurnishing:       false,          // per-room
     showBillingCycle:     false,          // billingCycle lives on each HostelRoom, not the property
     allowedBillingCycles: [],             // N/A at property level
     showSecurityDeposit:  false,          // per-room booking
-    showResidentialSubtype: false,
     isHostel:             true,
     isHotelLodge:         false,
-    showTotalRooms:       true,           // ← new: maximum HostelRoom entries allowed
+    showTotalRooms:       true,           // maximum HostelRoom entries allowed
     showHotelCategory:    false,
   },
-
   [PropertyType.HOTEL_LODGE]: {
     showNumberOfRooms:    true,
     showParking:          true,
-    showFloor:            true,           // ← enabled per client request (v2.2)
+    showFloor:            true,           
     showFurnishing:       true,           // hotel rooms are always furnished
     showBillingCycle:     true,
     allowedBillingCycles: [
@@ -189,13 +164,11 @@ export const PROPERTY_FIELD_CONFIG: Record<PropertyType, PropertyFieldConfig> = 
       BillingCycle.MONTHLY,
     ],
     showSecurityDeposit:  false,          // not standard for hotels/lodges
-    showResidentialSubtype: false,
     isHostel:             false,
     isHotelLodge:         true,
     showTotalRooms:       false,
-    showHotelCategory:    true,           // ← new: ORDINARY | VIP | VVIP
+    showHotelCategory:    true,           // ORDINARY | VIP | VVIP
   },
-
 };
 
 /**
@@ -218,7 +191,6 @@ export function stripInapplicableFields<T extends Record<string, unknown>>(
   if (!config.showFurnishing)         delete result.furnishing;
   if (!config.showBillingCycle)       delete result.billingCycle;
   if (!config.showSecurityDeposit)    delete result.securityDeposit;
-  if (!config.showResidentialSubtype) delete result.residentialSubtype;
   if (!config.showTotalRooms)         delete result.totalRooms;
   if (!config.showHotelCategory)      delete result.hotelCategory;
 

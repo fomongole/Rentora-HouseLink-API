@@ -8,7 +8,6 @@ import { Type } from 'class-transformer';
 import { PropertyType }       from '../enums/property-type.enum';
 import { FurnishingStatus }   from '../enums/furnishing-status.enum';
 import { BillingCycle }       from '../enums/billing-cycle.enum';
-import { ResidentialSubtype } from '../enums/residential-subtype.enum';
 import { HotelCategory }      from '../enums/hotel-category.enum';
 
 export class CreatePropertyDto {
@@ -23,15 +22,6 @@ export class CreatePropertyDto {
   @ApiProperty({ enum: PropertyType })
   @IsEnum(PropertyType)
   type: PropertyType;
-
-  /**
-   * Required when type = RESIDENTIAL_HOUSE.
-   * SINGLE = one bedroom / bedsitter, DOUBLE = two bedrooms.
-   */
-  @ApiPropertyOptional({ enum: ResidentialSubtype })
-  @IsEnum(ResidentialSubtype)
-  @IsOptional()
-  residentialSubtype?: ResidentialSubtype;
 
   @ApiProperty({ example: 800000 })
   @IsNumber()

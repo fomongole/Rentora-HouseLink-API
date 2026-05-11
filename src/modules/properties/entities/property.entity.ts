@@ -14,7 +14,6 @@ import { PropertyType }       from '../enums/property-type.enum';
 import { PropertyStatus }     from '../enums/property-status.enum';
 import { FurnishingStatus }   from '../enums/furnishing-status.enum';
 import { BillingCycle }       from '../enums/billing-cycle.enum';
-import { ResidentialSubtype } from '../enums/residential-subtype.enum';
 import { HotelCategory }      from '../enums/hotel-category.enum';
 import { District }           from '../../districts/entities/district.entity';
 import { PropertyImage }      from './property-image.entity';
@@ -34,13 +33,6 @@ export class Property {
   @Index()
   @Column({ type: 'enum', enum: PropertyType })
   type: PropertyType;
-
-  /**
-   * Only set when type = RESIDENTIAL_HOUSE.
-   * Distinguishes single-room from double-room houses.
-   */
-  @Column({ type: 'enum', enum: ResidentialSubtype, nullable: true })
-  residentialSubtype: ResidentialSubtype | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   price: number;
