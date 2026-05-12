@@ -29,6 +29,7 @@ import { HostelRoom } from '../hostel-rooms/entities/hostel-room.entity';
 import { BookingCreateResponse } from './interfaces/booking-create-response.interface';
 import { SyncBookingsDto } from './dto/sync-bookings.dto';
 import { EmailService } from '../email/email.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class BookingsService {
@@ -40,6 +41,7 @@ export class BookingsService {
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
+    private readonly config: ConfigService,
 ) {}
 
   /**
@@ -107,6 +109,15 @@ export class BookingsService {
     });
 
     const saved = await this.bookingRepository.save(booking);
+
+    // Notify admin of new booking
+    void this.emailService.sendNewBookingAlert(
+      this.config.get<string>('ADMIN_NOTIFICATION_EMAIL') ?? '',
+      saved.renterName,
+      saved.renterPhone,
+      saved.property.title,
+      saved.moveInDate?.toString() ?? '',
+    );
 
     if (hostelRoom) {
       await this.hostelRoomsService.setStatus(

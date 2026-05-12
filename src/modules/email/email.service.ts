@@ -114,6 +114,21 @@ export class EmailService {
     );
   }
 
+  async sendNewBookingAlert(
+    adminEmail: string,
+    renterName: string,
+    renterPhone: string,
+    propertyTitle: string,
+    moveInDate: string,
+  ): Promise<void> {
+    if (!adminEmail) return;
+    await this.send(
+      adminEmail,
+      `New Booking Request — ${propertyTitle}`,
+      this.newBookingAlertTemplate(renterName, renterPhone, propertyTitle, moveInDate),
+    );
+  }
+
   // ── HTML Templates ────────────────────────────────────────────────────────
   // All styles are inlined for maximum email client compatibility.
 
@@ -501,6 +516,60 @@ export class EmailService {
         You can browse other available properties on the Rentora Houselink Uganda app
         and submit a new booking request.
       </p>
+    `);
+  }
+
+  private newBookingAlertTemplate(
+    renterName: string,
+    renterPhone: string,
+    propertyTitle: string,
+    moveInDate: string,
+  ): string {
+    const portalUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
+    return this.base(`
+      <h2 style="margin:0 0 8px;color:#09090b;font-size:20px;font-weight:700;
+                letter-spacing:-0.3px;">New booking request</h2>
+      <p style="margin:0 0 22px;color:#52525b;font-size:14px;line-height:1.75;">
+        A new booking has been submitted and is waiting for your confirmation.
+      </p>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:12px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Property</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${propertyTitle}</p>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:12px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Renter</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${renterName}</p>
+          <p style="margin:4px 0 0;color:#52525b;font-size:13px;">${renterPhone}</p>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:28px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Requested move-in</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${moveInDate}</p>
+        </td></tr>
+      </table>
+
+      <a href="${portalUrl}/bookings"
+        style="display:inline-block;background:#09090b;color:#ffffff;
+                text-decoration:none;padding:12px 22px;border-radius:8px;
+                font-size:14px;font-weight:600;">
+        Review booking in portal &rarr;
+      </a>
     `);
   }
 }
