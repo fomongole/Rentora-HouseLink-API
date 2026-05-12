@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+
 import { Notification } from './entities/notification.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
@@ -17,7 +18,6 @@ export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
-
     /**
      * Direct user repository access — used only for the broadcast flow
      * to fetch all active RENTER user IDs. We do NOT inject UsersService
@@ -43,6 +43,7 @@ export class NotificationsService {
         data: params.data ?? null,
         isRead: false,
       });
+
       await this.notificationRepository.save(notification);
     } catch (err) {
       console.error('[Notifications] Failed to create notification:', err);
@@ -91,7 +92,6 @@ export class NotificationsService {
 
   async findForUser(userId: string, filters: FilterNotificationsDto) {
     const { type, isRead, page = 1, limit = 20 } = filters;
-
     const query = this.notificationRepository
       .createQueryBuilder('notification')
       .where('notification.userId = :userId', { userId })
@@ -133,7 +133,6 @@ export class NotificationsService {
 
   async markAsRead(id: string, userId: string): Promise<Notification> {
     const notification = await this.findOneForUser(id, userId);
-
     if (notification.isRead) return notification; // already read — no-op
 
     notification.isRead = true;
@@ -182,7 +181,7 @@ export class NotificationsService {
     return this.create({
       userId,
       type: NotificationType.WELCOME,
-      title: 'Welcome to NyumbaLink! 🏠',
+      title: 'Welcome to Rentora Houselink Uganda! 🏠',
       message: `Hi ${name}! Your account is ready. Start exploring properties near you.`,
       data: {},
     });
@@ -223,7 +222,7 @@ export class NotificationsService {
       userId,
       type: NotificationType.BOOKING_COMPLETED,
       title: 'Booking Completed',
-      message: `Your stay at "${payload.propertyTitle}" has been marked as completed. Thank you for using NyumbaLink!`,
+      message: `Your stay at "${payload.propertyTitle}" has been marked as completed. Thank you for choosing Rentora Houselink Uganda!`,
       data: payload,
     });
   }
@@ -234,6 +233,7 @@ export class NotificationsService {
   ): Promise<void> {
     const statusLabel = payload.newStatus.replace(/_/g, ' ');
     const categoryLabel = payload.category.replace(/_/g, ' ');
+
     const message = payload.adminReply
       ? `Your complaint (${categoryLabel}) is now ${statusLabel}. Admin reply: "${payload.adminReply}"`
       : `Your complaint (${categoryLabel}) status has been updated to ${statusLabel}.`;
@@ -267,7 +267,7 @@ export class NotificationsService {
       userId,
       type: NotificationType.ACCOUNT_ACTIVATED,
       title: 'Account Activated',
-      message: 'Your NyumbaLink account has been activated. You can now browse and book properties.',
+      message: 'Your Rentora Houselink Uganda account has been activated. You can now browse and book properties.',
     });
   }
 
@@ -276,7 +276,7 @@ export class NotificationsService {
       userId,
       type: NotificationType.ACCOUNT_DEACTIVATED,
       title: 'Account Deactivated',
-      message: 'Your NyumbaLink account has been deactivated. Please contact support if you believe this is an error.',
+      message: 'Your Rentora Houselink Uganda account has been deactivated. Please contact support if you believe this is an error.',
     });
   }
 
