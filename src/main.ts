@@ -51,7 +51,7 @@ async function bootstrap() {
       .setDescription('Backend API for the RentFinda property rental platform')
       .setVersion('1.0')
       .addBearerAuth()
-      .addCookieAuth('access_token') // ← Document the cookie auth too
+      .addCookieAuth('access_token')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
