@@ -74,6 +74,46 @@ export class EmailService {
     await this.send(email, 'Your password reset code — NyumbaLink', this.passwordResetOtpTemplate(name, otp));
   }
 
+  async sendComplaintReply(
+    email: string,
+    name: string,
+    category: string,
+    status: string,
+    reply: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Update on your complaint — Rentora Houselink Uganda',
+      this.complaintReplyTemplate(name, category, status, reply),
+    );
+  }
+
+  async sendBookingConfirmed(
+    email: string,
+    renterName: string,
+    propertyTitle: string,
+    moveInDate: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Your booking has been confirmed — Rentora Houselink Uganda',
+      this.bookingConfirmedTemplate(renterName, propertyTitle, moveInDate),
+    );
+  }
+
+  async sendBookingCancelled(
+    email: string,
+    renterName: string,
+    propertyTitle: string,
+    reason?: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Your booking has been cancelled — Rentora Houselink Uganda',
+      this.bookingCancelledTemplate(renterName, propertyTitle, reason),
+    );
+  }
+
   // ── HTML Templates ────────────────────────────────────────────────────────
   // All styles are inlined for maximum email client compatibility.
 
@@ -324,6 +364,142 @@ export class EmailService {
 
       <p style="margin:0;color:#a1a1aa;font-size:12px;">
         Requested at: ${new Date().toUTCString()}
+      </p>
+    `);
+  }
+
+  private complaintReplyTemplate(
+  name: string,
+  category: string,
+  status: string,
+  reply: string,
+): string {
+  const categoryLabel = category.replace(/_/g, ' ');
+  const statusLabel   = status.replace(/_/g, ' ');
+
+    return this.base(`
+      <h2 style="margin:0 0 8px;color:#09090b;font-size:20px;font-weight:700;
+                letter-spacing:-0.3px;">Update on your complaint</h2>
+      <p style="margin:0 0 22px;color:#52525b;font-size:14px;line-height:1.75;">
+        Hi <strong>${name}</strong>, our team has reviewed your complaint
+        regarding <strong>${categoryLabel}</strong> and has sent you the
+        following update.
+      </p>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:20px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Status</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${statusLabel}</p>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f0fdf4;border-left:3px solid #16a34a;
+                    border-radius:0 8px 8px 0;padding:14px 18px;
+                    margin-bottom:24px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 6px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Message from our team</p>
+          <p style="margin:0;color:#09090b;font-size:14px;line-height:1.7;">${reply}</p>
+        </td></tr>
+      </table>
+
+      <p style="margin:0;color:#a1a1aa;font-size:13px;line-height:1.6;">
+        If you have further concerns, please submit a new complaint through the app
+        or contact us directly.
+      </p>
+    `);
+  }
+
+  private bookingConfirmedTemplate(
+    name: string,
+    propertyTitle: string,
+    moveInDate: string,
+  ): string {
+    return this.base(`
+      <h2 style="margin:0 0 8px;color:#09090b;font-size:20px;font-weight:700;
+                letter-spacing:-0.3px;">Booking confirmed ✅</h2>
+      <p style="margin:0 0 22px;color:#52525b;font-size:14px;line-height:1.75;">
+        Hi <strong>${name}</strong>, great news — your booking has been
+        confirmed by the property manager.
+      </p>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:20px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Property</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${propertyTitle}</p>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:28px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Move-in date</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${moveInDate}</p>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f0fdf4;border-left:3px solid #16a34a;
+                    border-radius:0 8px 8px 0;padding:14px 18px;
+                    margin-bottom:8px;width:100%;">
+        <tr><td>
+          <p style="margin:0;color:#166534;font-size:13px;line-height:1.65;">
+            Please ensure you are available on the move-in date. Contact the
+            property manager if you need to make any changes.
+          </p>
+        </td></tr>
+      </table>
+    `);
+  }
+
+  private bookingCancelledTemplate(
+    name: string,
+    propertyTitle: string,
+    reason?: string,
+  ): string {
+    return this.base(`
+      <h2 style="margin:0 0 8px;color:#09090b;font-size:20px;font-weight:700;
+                letter-spacing:-0.3px;">Booking cancelled</h2>
+      <p style="margin:0 0 22px;color:#52525b;font-size:14px;line-height:1.75;">
+        Hi <strong>${name}</strong>, unfortunately your booking has been
+        cancelled by the property manager.
+      </p>
+
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                    margin-bottom:20px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Property</p>
+          <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${propertyTitle}</p>
+        </td></tr>
+      </table>
+
+      ${reason ? `
+      <table cellpadding="0" cellspacing="0" role="presentation"
+            style="background:#fef2f2;border-left:3px solid #dc2626;
+                    border-radius:0 8px 8px 0;padding:14px 18px;
+                    margin-bottom:24px;width:100%;">
+        <tr><td>
+          <p style="margin:0 0 6px;color:#71717a;font-size:11px;
+                    text-transform:uppercase;letter-spacing:0.6px;">Reason</p>
+          <p style="margin:0;color:#09090b;font-size:13px;line-height:1.65;">${reason}</p>
+        </td></tr>
+      </table>
+      ` : ''}
+
+      <p style="margin:0;color:#52525b;font-size:13px;line-height:1.6;">
+        You can browse other available properties on the Rentora Houselink Uganda app
+        and submit a new booking request.
       </p>
     `);
   }

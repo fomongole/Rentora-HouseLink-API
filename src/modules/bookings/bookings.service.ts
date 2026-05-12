@@ -28,17 +28,19 @@ import { User } from '../users/entities/user.entity';
 import { HostelRoom } from '../hostel-rooms/entities/hostel-room.entity';
 import { BookingCreateResponse } from './interfaces/booking-create-response.interface';
 import { SyncBookingsDto } from './dto/sync-bookings.dto';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class BookingsService {
   constructor(
-    @InjectRepository(Booking)
+  @InjectRepository(Booking)
     private readonly bookingRepository: Repository<Booking>,
     private readonly propertiesService: PropertiesService,
     private readonly hostelRoomsService: HostelRoomsService,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+    private readonly emailService: EmailService,
+) {}
 
   /**
    * Called from the mobile app (public endpoint — no auth required).
@@ -210,6 +212,16 @@ export class BookingsService {
       });
     }
 
+    // ── Email confirmation ─────────────────────────────────────────────────
+    if (saved.renterEmail) {
+      void this.emailService.sendBookingConfirmed(
+        saved.renterEmail,
+        saved.renterName,
+        saved.property.title,
+        saved.moveInDate?.toString() ?? '',
+      );
+    }
+
     return saved;
   }
 
@@ -282,6 +294,16 @@ export class BookingsService {
         propertyTitle: saved.property.title,
         reason: dto.reason,
       });
+    }
+
+    // ── Email cancellation (admin only — renter triggered it themselves) ───
+    if (cancelledBy === 'admin' && saved.renterEmail) {
+      void this.emailService.sendBookingCancelled(
+        saved.renterEmail,
+        saved.renterName,
+        saved.property.title,
+        dto.reason,
+      );
     }
 
     return saved;

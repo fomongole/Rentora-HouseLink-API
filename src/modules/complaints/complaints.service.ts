@@ -8,6 +8,7 @@ import { UpdateComplaintStatusDto } from './dto/update-complaint-status.dto';
 import { ComplaintStatus } from './enums/complaint-status.enum';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import { AuditAction } from '../audit-logs/enums/audit-action.enum';
 import { AuditEntity } from '../audit-logs/enums/audit-entity.enum';
 import { User } from '../users/entities/user.entity';
@@ -22,18 +23,13 @@ export class ComplaintsService {
     private readonly propertiesService: PropertiesService,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
-  /**
-   * Called from the mobile app — no authentication required.
-   * Renters submit complaints anonymously (contact details optional but encouraged).
-   * If the renter is logged in, they can pass their userId for notification delivery.
-   */
   async create(dto: CreateComplaintDto): Promise<Complaint> {
     let property: Property | null = null;
 
     if (dto.propertyId) {
-      // Validates the property exists; throws 404 if not
       property = await this.propertiesService.findOne(dto.propertyId);
     }
 
@@ -83,12 +79,6 @@ export class ComplaintsService {
     return complaint;
   }
 
-  /**
-   * Admin updates the status and optionally adds internal notes.
-   * Automatically records resolvedAt / resolvedByName when status moves
-   * to RESOLVED or CLOSED.
-   * Sends a COMPLAINT_UPDATED notification to the renter if they linked their account.
-   */
   async updateStatus(
     id: string,
     dto: UpdateComplaintStatusDto,
@@ -98,16 +88,13 @@ export class ComplaintsService {
     const previousStatus = complaint.status;
 
     if (complaint.status === dto.status) {
-      throw new BadRequestException(
-        `Complaint is already in status "${dto.status}".`,
-      );
+      throw new BadRequestException(`Complaint is already in status "${dto.status}".`);
     }
 
     complaint.status = dto.status;
 
-    if (dto.adminNotes) {
-      complaint.adminNotes = dto.adminNotes;
-    }
+    if (dto.adminNotes)  complaint.adminNotes  = dto.adminNotes;
+    if (dto.adminReply)  complaint.adminReply  = dto.adminReply;
 
     const isClosingStatus =
       dto.status === ComplaintStatus.RESOLVED ||
@@ -117,7 +104,6 @@ export class ComplaintsService {
       complaint.resolvedAt     = new Date();
       complaint.resolvedByName = performedBy.name;
     } else {
-      // Allow re-opening — clear resolution metadata
       complaint.resolvedAt     = null;
       complaint.resolvedByName = null;
     }
@@ -130,27 +116,39 @@ export class ComplaintsService {
       entityId: saved.id,
       entityTitle: `Complaint by ${saved.submitterName} — ${saved.category}`,
       performedBy,
-      metadata: { from: previousStatus, to: dto.status },
+      metadata: { from: previousStatus, to: dto.status, hasReply: !!dto.adminReply },
     });
 
-    // Notify the renter if they linked their account when submitting
+    // ── In-app notification — include reply text if provided ──────────────
     if (saved.userId) {
       void this.notificationsService.sendComplaintUpdated(saved.userId, {
         complaintId: saved.id,
         newStatus: dto.status,
         category: saved.category,
+        adminReply: dto.adminReply,
       });
+    }
+
+    // ── Email — send to renter if they provided an email and admin replied ──
+    if (saved.submitterEmail && dto.adminReply) {
+      void this.emailService.sendComplaintReply(
+        saved.submitterEmail,
+        saved.submitterName,
+        saved.category,
+        dto.status,
+        dto.adminReply,
+      );
     }
 
     return saved;
   }
 
   async getStats() {
-    const total       = await this.complaintRepository.count();
-    const open        = await this.complaintRepository.count({ where: { status: ComplaintStatus.OPEN } });
-    const inProgress  = await this.complaintRepository.count({ where: { status: ComplaintStatus.IN_PROGRESS } });
-    const resolved    = await this.complaintRepository.count({ where: { status: ComplaintStatus.RESOLVED } });
-    const closed      = await this.complaintRepository.count({ where: { status: ComplaintStatus.CLOSED } });
+    const total      = await this.complaintRepository.count();
+    const open       = await this.complaintRepository.count({ where: { status: ComplaintStatus.OPEN } });
+    const inProgress = await this.complaintRepository.count({ where: { status: ComplaintStatus.IN_PROGRESS } });
+    const resolved   = await this.complaintRepository.count({ where: { status: ComplaintStatus.RESOLVED } });
+    const closed     = await this.complaintRepository.count({ where: { status: ComplaintStatus.CLOSED } });
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);

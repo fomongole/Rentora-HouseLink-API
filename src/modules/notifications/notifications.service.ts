@@ -230,13 +230,19 @@ export class NotificationsService {
 
   sendComplaintUpdated(
     userId: string,
-    payload: { complaintId: string; newStatus: string; category: string },
+    payload: { complaintId: string; newStatus: string; category: string; adminReply?: string },
   ): Promise<void> {
+    const statusLabel = payload.newStatus.replace(/_/g, ' ');
+    const categoryLabel = payload.category.replace(/_/g, ' ');
+    const message = payload.adminReply
+      ? `Your complaint (${categoryLabel}) is now ${statusLabel}. Admin reply: "${payload.adminReply}"`
+      : `Your complaint (${categoryLabel}) status has been updated to ${statusLabel}.`;
+
     return this.create({
       userId,
       type: NotificationType.COMPLAINT_UPDATED,
       title: 'Complaint Update',
-      message: `Your complaint (${payload.category.replace(/_/g, ' ')}) status has been updated to ${payload.newStatus.replace(/_/g, ' ')}.`,
+      message,
       data: payload,
     });
   }
