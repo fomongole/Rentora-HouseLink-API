@@ -47,7 +47,7 @@ async function bootstrap() {
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('RentFinda Uganda API')
+      .setTitle('Rentora HouseLink Uganda')
       .setDescription('Backend API for the RentFinda property rental platform')
       .setVersion('1.0')
       .addBearerAuth()
