@@ -18,14 +18,14 @@ export class University {
    * Common abbreviation shown in UI dropdowns and property cards.
    * e.g. 'MUK', 'KYU', 'UCU'.
    */
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 20, nullable: true })
   shortName: string | null;
 
   /**
    * Human-readable area / neighbourhood.
    * e.g. 'Wandegeya, Kampala'.
    */
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 200, nullable: true })
   location: string | null;
 
   @CreateDateColumn()
