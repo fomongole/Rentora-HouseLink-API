@@ -27,6 +27,14 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  /**
+   * When set, the account is pending deletion and will be hard-deleted
+   * by the nightly cleanup task once this timestamp passes.
+   * The user is immediately locked out when this is set.
+   */
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  scheduledPurgeAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

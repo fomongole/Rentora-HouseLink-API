@@ -74,6 +74,18 @@ export class EmailService {
     await this.send(email, 'Your password reset code — Rentora Houselink Uganda', this.passwordResetOtpTemplate(name, otp));
   }
 
+  async sendAccountDeletionScheduled(
+    email: string,
+    name: string,
+    purgeAt: Date,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Your Rentora account has been scheduled for deletion',
+      this.accountDeletionScheduledTemplate(name, purgeAt),
+    );
+  }
+
   async sendComplaintReply(
     email: string,
     name: string,
@@ -552,4 +564,52 @@ export class EmailService {
       </a>
     `);
   }
+
+  private accountDeletionScheduledTemplate(name: string, purgeAt: Date): string {
+  const purgeDate = purgeAt.toLocaleDateString('en-UG', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  return this.base(`
+    <h2 style="margin:0 0 8px;color:#09090b;font-size:20px;font-weight:700;
+               letter-spacing:-0.3px;">Account deletion scheduled</h2>
+    <p style="margin:0 0 22px;color:#52525b;font-size:14px;line-height:1.75;">
+      Hi <strong>${name}</strong>, we have received your request to delete
+      your Rentora Houselink Uganda account.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" role="presentation"
+           style="background:#f4f4f5;border-radius:8px;padding:16px 20px;
+                  margin-bottom:20px;width:100%;">
+      <tr><td>
+        <p style="margin:0 0 4px;color:#71717a;font-size:11px;
+                  text-transform:uppercase;letter-spacing:0.6px;">Permanent deletion date</p>
+        <p style="margin:0;color:#09090b;font-size:14px;font-weight:600;">${purgeDate}</p>
+      </td></tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" role="presentation"
+           style="background:#fef3c7;border-left:3px solid #f59e0b;
+                  border-radius:0 8px 8px 0;padding:14px 18px;
+                  margin-bottom:24px;width:100%;">
+      <tr><td>
+        <p style="margin:0;color:#92400e;font-size:13px;line-height:1.65;">
+          <strong>Changed your mind?</strong> Email us at
+          <a href="mailto:support@rentora.ug"
+             style="color:#92400e;font-weight:600;">support@rentora.ug</a>
+          before <strong>${purgeDate}</strong> and we will cancel the deletion.
+          After that date, your account and all associated data — bookings,
+          favourites, and profile — will be permanently removed and cannot
+          be recovered.
+        </p>
+      </td></tr>
+    </table>
+
+    <p style="margin:0;color:#a1a1aa;font-size:12px;">
+      Requested at: ${new Date().toUTCString()}
+    </p>
+  `);
+}
 }

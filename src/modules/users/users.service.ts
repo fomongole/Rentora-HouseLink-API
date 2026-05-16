@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
@@ -17,6 +17,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
 import { AuditAction } from '../audit-logs/enums/audit-action.enum';
 import { AuditEntity } from '../audit-logs/enums/audit-entity.enum';
+
+/** Grace period before a deletion request is permanently executed. */
+const DELETION_GRACE_DAYS = 30;
 
 @Injectable()
 export class UsersService {
@@ -41,7 +44,6 @@ export class UsersService {
     const user = this.userRepository.create({ name, email, password: hashed, role });
     const saved = await this.userRepository.save(user);
 
-    // Welcome notification — only for RENTER accounts
     if (saved.role === UserRole.RENTER) {
       void this.notificationsService.sendWelcome(saved.id, saved.name);
     }
@@ -66,7 +68,6 @@ export class UsersService {
       metadata: { role: user.role, email: user.email },
     });
 
-    // ── Email: welcome the new admin with their login URL ─────────────────
     void this.emailService.sendAdminWelcome(user.email, user.name);
 
     return user;
@@ -110,7 +111,6 @@ export class UsersService {
     Object.assign(user, dto);
     const saved = await this.userRepository.save(user);
 
-    // ── Email: notify both old and new address when email changes ─────────
     if (dto.email && dto.email !== oldEmail) {
       void this.emailService.sendEmailChanged(oldEmail, dto.email, saved.name);
     }
@@ -133,10 +133,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
-
-    if (!isMatch) {
-      throw new BadRequestException('Current password is incorrect');
-    }
+    if (!isMatch) throw new BadRequestException('Current password is incorrect');
 
     const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
     await this.userRepository.update(userId, { password: hashedNewPassword });
@@ -149,10 +146,7 @@ export class UsersService {
       performedBy,
     });
 
-    // ── In-app notification ───────────────────────────────────────────────
     void this.notificationsService.sendPasswordChanged(userId);
-
-    // ── Email: security alert so the user can spot an unauthorised change ──
     void this.emailService.sendPasswordChanged(user.email, user.name);
 
     return { message: 'Password changed successfully' };
@@ -180,7 +174,6 @@ export class UsersService {
       metadata: { isActive: saved.isActive },
     });
 
-    // ── In-app notifications ──────────────────────────────────────────────
     if (saved.isActive) {
       void this.notificationsService.sendAccountActivated(saved.id);
       void this.emailService.sendAccountActivated(saved.email, saved.name);
@@ -196,5 +189,73 @@ export class UsersService {
   /** Internal use only — called by the password-reset OTP flow. */
   async updatePasswordDirectly(userId: string, hashedPassword: string): Promise<void> {
     await this.userRepository.update(userId, { password: hashedPassword });
+  }
+
+  // ── Account deletion ────────────────────────────────────────────────────────
+
+  /**
+   * Marks the account for deletion after a grace period.
+   *
+   * - Sets scheduledPurgeAt = now + 30 days
+   * - Does NOT hard-delete immediately (gives the user a safety net)
+   * - The JWT strategy will reject this user on their next request,
+   *   effectively forcing a logout
+   * - The nightly cleanup task in users-cleanup.task.ts executes the
+   *   hard delete once the grace period expires
+   */
+  async requestDeletion(userId: string): Promise<{ message: string; purgeAt: Date }> {
+    const user = await this.findById(userId);
+
+    if (user.scheduledPurgeAt) {
+      throw new ConflictException(
+        'Your account is already scheduled for deletion. Contact support to cancel.',
+      );
+    }
+
+    const purgeAt = new Date(
+      Date.now() + DELETION_GRACE_DAYS * 24 * 60 * 60 * 1_000,
+    );
+
+    await this.userRepository.update(userId, { scheduledPurgeAt: purgeAt });
+
+    await this.auditLogsService.log({
+      action: AuditAction.DELETE,
+      entity: AuditEntity.USER,
+      entityId: user.id,
+      entityTitle: user.name,
+      performedBy: user,
+      metadata: { scheduledPurgeAt: purgeAt },
+    });
+
+    // Notify the user — let them know they have 30 days to contact support
+    // if the deletion was accidental.
+    void this.emailService.sendAccountDeletionScheduled(
+      user.email,
+      user.name,
+      purgeAt,
+    );
+
+    return {
+      message: `Your account has been scheduled for permanent deletion on ${purgeAt.toDateString()}. This action can be reversed by contacting support before that date.`,
+      purgeAt,
+    };
+  }
+
+  /**
+   * Called by the nightly cleanup task.
+   * Hard-deletes all accounts whose grace period has expired.
+   * Returns the number of accounts purged.
+   */
+  async purgeExpiredDeletions(): Promise<number> {
+    const expired = await this.userRepository.find({
+      where: {
+        scheduledPurgeAt: LessThan(new Date()),
+      },
+    });
+
+    if (expired.length === 0) return 0;
+
+    await this.userRepository.remove(expired);
+    return expired.length;
   }
 }

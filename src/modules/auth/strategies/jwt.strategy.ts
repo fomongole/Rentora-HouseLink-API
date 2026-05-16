@@ -38,6 +38,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (!user) throw new UnauthorizedException('Session expired. Please log in again.');
       if (!user.isActive) throw new UnauthorizedException('Account is deactivated.');
 
+      if (user.scheduledPurgeAt) {
+        throw new UnauthorizedException(
+          'This account is pending deletion. Contact support@rentora.ug if this was a mistake.',
+        );
+      }
+
       return user;
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
