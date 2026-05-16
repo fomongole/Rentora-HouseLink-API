@@ -32,7 +32,7 @@ export class User {
    * by the nightly cleanup task once this timestamp passes.
    * The user is immediately locked out when this is set.
    */
-  @Column({ type: 'timestamptz', nullable: true, default: null })
+  @Column({ type: 'timestamptz', nullable: true, default: null, name: 'scheduled_purge_at' })
   scheduledPurgeAt: Date | null;
 
   @CreateDateColumn()
