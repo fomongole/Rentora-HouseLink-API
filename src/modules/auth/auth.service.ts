@@ -80,6 +80,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // ── Block accounts pending deletion ────────────────────────────────────
+    // The token would be issued but rejected on every subsequent request anyway.
+    // Failing here at login is cleaner and avoids the confusing half-authenticated state.
+    if (user.scheduledPurgeAt) {
+      await this.auditLogsService.log({
+        action: AuditAction.LOGIN_FAILED,
+        entity: AuditEntity.AUTH,
+        entityTitle: `Login attempt on deletion-pending account for ${user.email}`,
+        performedBy: user,
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     await this.auditLogsService.log({
       action: AuditAction.LOGIN,
       entity: AuditEntity.AUTH,
